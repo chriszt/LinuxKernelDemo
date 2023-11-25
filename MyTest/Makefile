@@ -1,10 +1,9 @@
-BASEINCLUDE ?= /home/yl/proj/linux-hwe-5.15-5.15.0
+BASEINCLUDE ?= /home/yl/Kernel/linux-hwe-5.15-5.15.0
 
-mytest-objs := my_test.o
-obj-m := mytest.o
+obj-m := MyTest.o
 
-all :
+all:
 	make -C $(BASEINCLUDE) M=$(PWD) modules
 
-clean :
-	rm -rf *.ko
+clean:
+	make -C $(BASEINCLUDE) M=$(PWD) clean
