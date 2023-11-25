@@ -6,7 +6,7 @@ void Func1(void)
     printk("this is Func1()\n");
 }
 
-static int __init my_test_init(void)
+static int __init mytest_init(void)
 {
     int i;
     Func1();
@@ -23,7 +23,7 @@ void Func2(void)
     printk("this is Func2()\n");
 }
 
-static void __exit my_test_exit(void)
+static void __exit mytest_exit(void)
 {
     int i;
     Func2();
@@ -34,10 +34,10 @@ static void __exit my_test_exit(void)
     printk("good bye2\n");
 }
 
-module_init(my_test_init);
-module_exit(my_test_exit);
+module_init(mytest_init);
+module_exit(mytest_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Chris ZT");
-MODULE_DESCRIPTION("my test kernel module");
+MODULE_DESCRIPTION("mytest kernel module");
 MODULE_ALIAS("mytest");

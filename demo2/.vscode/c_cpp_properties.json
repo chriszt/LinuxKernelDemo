@@ -3,7 +3,7 @@
         {
             "name": "Linux",
             "includePath": [
-                "/home/yl/proj/linux-hwe-5.15-5.15.0/include/**",
+                "/home/yl/Kernel/linux-hwe-5.15-5.15.0/include/**",
                 "${workspaceFolder}/**"
             ],
             "defines": [],
