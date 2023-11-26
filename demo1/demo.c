@@ -14,22 +14,22 @@ static int mytest = 100;
 module_param(mytest, int, 0644);
 MODULE_PARM_DESC(mytest, "Test for Module Parameter");
 
-static int __init demo1_init(void)
+static int __init demo_init(void)
 {
-    dprintk("[demo1] init\n");
-    dprintk("[demo1] module param=%d\n", mytest);
+    dprintk("[demo] init\n");
+    dprintk("[demo] module param=%d\n", mytest);
     return 0;
 }
 
-static void __exit demo1_exit(void)
+static void __exit demo_exit(void)
 {
-    printk("[demo1] goog bye!\n");
+    printk("[demo] goog bye!\n");
 }
 
-module_init(demo1_init);
-module_exit(demo1_exit);
+module_init(demo_init);
+module_exit(demo_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Chris ZT");
-MODULE_DESCRIPTION("demo1 kernel module");
-MODULE_ALIAS("demo1");
+MODULE_DESCRIPTION("demo kernel module");
+MODULE_ALIAS("demo");

@@ -1,6 +1,6 @@
 BASEINCLUDE ?= /home/yl/Kernel/linux-hwe-5.15-5.15.0
 
-obj-m := demo2.o
+obj-m := demo.o
 
 all:
 	make -C $(BASEINCLUDE) M=$(PWD) modules
