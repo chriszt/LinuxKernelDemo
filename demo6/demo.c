@@ -1,16 +1,16 @@
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/uaccess.h>
-#include <linux/cdev.h>
 #include <linux/miscdevice.h>
 #include <linux/kfifo.h>
+#include <linux/wait.h>
 
 #define DEMO_NAME "my_demo_dev"
 #define MAX_DEVICE_BUFFER_SIZE 64
-// static struct device *g_dev;
-// static char g_devBuf[MAX_DEVICE_BUFFER_SIZE];
+
 DEFINE_KFIFO(g_kfifo, char, MAX_DEVICE_BUFFER_SIZE);
+
+static wait_queue_head_t g_readQueue;
+static wait_queue_head_t g_writeQueue;
 
 static int demo_open(struct inode *inode, struct file *file)
 {
@@ -29,9 +29,23 @@ static int demo_release(struct inode *inode, struct file *file)
 static ssize_t demo_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
     int actualReaded;
-    int ret = kfifo_to_user(&g_kfifo, buf, count, &actualReaded);
+    int ret;
+    if (kfifo_is_empty(&g_kfifo)) {
+        if (file->f_flags & O_NONBLOCK) {
+            return -EAGAIN;
+        }
+        printk("[demo] %s: pid=%d going to sleep\n", __func__, current->pid);
+        ret = wait_event_interruptible(g_readQueue, !kfifo_is_empty(&g_kfifo));
+        if (ret) {
+            return ret;
+        }
+    }
+    ret = kfifo_to_user(&g_kfifo, buf, count, &actualReaded);
     if (ret) {
         return -EIO;
+    }
+    if (!kfifo_is_full(&g_kfifo)) {
+        wake_up_interruptible(&g_writeQueue);
     }
     printk("[demo] %s, actualReaded=%d, pos=%lld\n", __func__, actualReaded, *pos);
     return actualReaded;
@@ -40,9 +54,23 @@ static ssize_t demo_read(struct file *file, char __user *buf, size_t count, loff
 static ssize_t demo_write(struct file *file, const char __user *buf, size_t count, loff_t *pos)
 {
     int actualWrited;
-    int ret = kfifo_from_user(&g_kfifo, buf, count, &actualWrited);
+    int ret;
+    if (kfifo_is_full(&g_kfifo)) {
+        if (file->f_flags & O_NONBLOCK) {
+            return -EAGAIN;
+        }
+        printk("[demo] %s: pid=%d going to sleep\n", __func__, current->pid);
+        ret = wait_event_interruptible(g_writeQueue, !kfifo_is_full(&g_kfifo));
+        if (ret) {
+            return ret;
+        }
+    }
+    ret = kfifo_from_user(&g_kfifo, buf, count, &actualWrited);
     if (ret) {
         return -EIO;
+    }
+    if (!kfifo_is_empty(&g_kfifo)) {
+        wake_up_interruptible(&g_readQueue);
     }
     printk("[demo] %s, actualWrited=%d, pos=%lld\n", __func__, actualWrited, *pos);
     return actualWrited;
@@ -69,7 +97,8 @@ static int __init demo_init(void)
         printk("[demo] register misc device failed(%d)\n", ret);
         return ret;
     }
-    // g_dev = g_miscDev.this_device;
+    init_waitqueue_head(&g_readQueue);
+    init_waitqueue_head(&g_writeQueue);
     printk("[demo] register misc device succeeded: %s\n", DEMO_NAME);
     return 0;
 }

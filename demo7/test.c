@@ -24,13 +24,13 @@ int main()
         return -1;
     }
     fprintf(stdout, "[demo] write %d bytes to device\n", ret);
-    // close(fd);
+    close(fd);
 
-    // fd = open(DEMO_DEV_NAME, O_RDWR);
-    // if (fd < 0) {
-    //     fprintf(stderr, "[demo] open device %s failed\n", DEMO_DEV_NAME);
-    //     return -1;
-    // }
+    fd = open(DEMO_DEV_NAME, O_RDWR);
+    if (fd < 0) {
+        fprintf(stderr, "[demo] open device %s failed\n", DEMO_DEV_NAME);
+        return -1;
+    }
     char buf[10] = {};
     ret = read(fd, buf, sizeof(buf));
     fprintf(stdout, "[demo] read %d bytes, buf=%s\n", ret, buf);

@@ -8,8 +8,6 @@
 
 #define DEMO_NAME "my_demo_dev"
 #define MAX_DEVICE_BUFFER_SIZE 64
-// static struct device *g_dev;
-// static char g_devBuf[MAX_DEVICE_BUFFER_SIZE];
 DEFINE_KFIFO(g_kfifo, char, MAX_DEVICE_BUFFER_SIZE);
 
 static int demo_open(struct inode *inode, struct file *file)
@@ -29,7 +27,14 @@ static int demo_release(struct inode *inode, struct file *file)
 static ssize_t demo_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 {
     int actualReaded;
-    int ret = kfifo_to_user(&g_kfifo, buf, count, &actualReaded);
+    int ret;
+    if (kfifo_is_empty(&g_kfifo)) {
+        if (file->f_flags & O_NONBLOCK) {
+            printk("[demo] %s, set O_NONBLOCK, f_flags=0x%x, O_NONBLOCK=%x\n", __func__, file->f_flags, O_NONBLOCK);
+            return -EAGAIN;
+        }
+    }
+    ret = kfifo_to_user(&g_kfifo, buf, count, &actualReaded);
     if (ret) {
         return -EIO;
     }
@@ -40,7 +45,14 @@ static ssize_t demo_read(struct file *file, char __user *buf, size_t count, loff
 static ssize_t demo_write(struct file *file, const char __user *buf, size_t count, loff_t *pos)
 {
     int actualWrited;
-    int ret = kfifo_from_user(&g_kfifo, buf, count, &actualWrited);
+    int ret;
+    if (kfifo_is_full(&g_kfifo)) {
+        if (file->f_flags & O_NONBLOCK) {
+            printk("[demo] %s, set O_NONBLOCK, f_flags=0x%x, O_NONBLOCK=%x\n", __func__, file->f_flags, O_NONBLOCK);
+            return -EAGAIN;
+        }
+    }
+    ret = kfifo_from_user(&g_kfifo, buf, count, &actualWrited);
     if (ret) {
         return -EIO;
     }
@@ -69,7 +81,6 @@ static int __init demo_init(void)
         printk("[demo] register misc device failed(%d)\n", ret);
         return ret;
     }
-    // g_dev = g_miscDev.this_device;
     printk("[demo] register misc device succeeded: %s\n", DEMO_NAME);
     return 0;
 }
