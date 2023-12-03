@@ -16,14 +16,14 @@
 struct demo_device {
     char name[MAX_BUFFER_SIZE];
     struct device *dev;
-    wait_queue_head_t readQueue;
-    wait_queue_head_t writeQueue;
-    struct kfifo fifo;
 };
 
 struct demo_private_data {
     struct demo_device *demoDev;
     char name[MAX_BUFFER_SIZE];
+    wait_queue_head_t readQueue;
+    wait_queue_head_t writeQueue;
+    struct kfifo fifo;
 };
 
 static dev_t g_dev;
@@ -35,6 +35,7 @@ static int demo_open(struct inode *inode, struct file *file)
     unsigned int minor = iminor(inode);
     struct demo_private_data *priData;
     struct demo_device *demoDev = g_demoDevs[minor];
+    int ret;
     
     printk("[demo] %s, major=%d, minor=%d, demoDev=%s\n", __func__, MAJOR(inode->i_rdev), MINOR(inode->i_rdev), demoDev->name);
 
@@ -44,6 +45,15 @@ static int demo_open(struct inode *inode, struct file *file)
     }
 
     sprintf(priData->name, "private_data_%d", minor);
+
+    ret = kfifo_alloc(&priData->fifo, FIFO_SIZE, GFP_KERNEL);
+    if (ret) {
+        kfree(priData);
+        return -ENOMEM;
+    }
+    init_waitqueue_head(&priData->readQueue);
+    init_waitqueue_head(&priData->writeQueue);
+
     priData->demoDev = demoDev;
 
     file->private_data = priData;
@@ -66,24 +76,24 @@ static ssize_t demo_read(struct file *file, char __user *buf, size_t count, loff
     int actualReaded;
     int ret;
 
-    if (kfifo_is_empty(&demoDev->fifo)) {
+    if (kfifo_is_empty(&priData->fifo)) {
         if (file->f_flags & O_NONBLOCK) {
             return -EAGAIN;
         }
         printk("[demo] %s:%s pid=%d, going to sleep, %s\n", __func__, demoDev->name, current->pid, priData->name);
-        ret = wait_event_interruptible(demoDev->readQueue, !kfifo_is_empty(&demoDev->fifo));
+        ret = wait_event_interruptible(priData->readQueue, !kfifo_is_empty(&priData->fifo));
         if (ret) {
             return ret;
         }
     }
 
-    ret = kfifo_to_user(&demoDev->fifo, buf, count, &actualReaded);
+    ret = kfifo_to_user(&priData->fifo, buf, count, &actualReaded);
     if (ret) {
         return -EIO;
     }
 
-    if (!kfifo_is_full(&demoDev->fifo)) {
-        wake_up_interruptible(&demoDev->writeQueue);
+    if (!kfifo_is_full(&priData->fifo)) {
+        wake_up_interruptible(&priData->writeQueue);
     }
 
     printk("[demo] %s:%s pid=%d, actualReaded=%d, pos=%lld\n", __func__, demoDev->name, current->pid, actualReaded, *pos);
@@ -98,24 +108,24 @@ static ssize_t demo_write(struct file *file, const char __user *buf, size_t coun
     int actualWritten;
     int ret;
 
-    if (kfifo_is_full(&demoDev->fifo)) {
+    if (kfifo_is_full(&priData->fifo)) {
         if (file->f_flags & O_NONBLOCK) {
             return -EAGAIN;
         }
         printk("[demo] %s:%s pid=%d, going to sleep, %s\n", __func__, demoDev->name, current->pid, priData->name);
-        ret = wait_event_interruptible(demoDev->writeQueue, !kfifo_is_full(&demoDev->fifo));
+        ret = wait_event_interruptible(priData->writeQueue, !kfifo_is_full(&priData->fifo));
         if (ret) {
             return ret;
         }
     }
 
-    ret = kfifo_from_user(&demoDev->fifo, buf, count, &actualWritten);
+    ret = kfifo_from_user(&priData->fifo, buf, count, &actualWritten);
     if (ret) {
         return -EIO;
     }
 
-    if (!kfifo_is_empty(&demoDev->fifo)) {
-        wake_up_interruptible(&demoDev->readQueue);
+    if (!kfifo_is_empty(&priData->fifo)) {
+        wake_up_interruptible(&priData->readQueue);
     }
 
     printk("[demo] %s:%s pid=%d, actualWritten=%d, pos=%lld\n", __func__, demoDev->name, current->pid, actualWritten, *pos);
@@ -127,15 +137,14 @@ __poll_t demo_poll(struct file *file, struct poll_table_struct *wait)
 {
     __poll_t mask = 0;
     struct demo_private_data *priData = file->private_data;
-    struct demo_device *demoDev = priData->demoDev;
 
-    poll_wait(file, &demoDev->readQueue, wait);
-    poll_wait(file, &demoDev->writeQueue, wait);
+    poll_wait(file, &priData->readQueue, wait);
+    poll_wait(file, &priData->writeQueue, wait);
     
-    if (!kfifo_is_empty(&demoDev->fifo)) {
+    if (!kfifo_is_empty(&priData->fifo)) {
         mask |= POLLIN | POLLRDNORM;
     }
-    if (!kfifo_is_full(&demoDev->fifo)) {
+    if (!kfifo_is_full(&priData->fifo)) {
         mask |= POLLOUT | POLLWRNORM;
     }
     
@@ -188,13 +197,6 @@ static int __init demo_init(void)
             goto FREE_DEVICE;
         }
         sprintf(demoDev->name, "%s%d", DEMO_NAME, i);
-        init_waitqueue_head(&demoDev->readQueue);
-        init_waitqueue_head(&demoDev->writeQueue);
-        ret = kfifo_alloc(&demoDev->fifo, FIFO_SIZE, GFP_KERNEL);
-        if (ret) {
-            ret = -ENOMEM;
-            goto FREE_KFIFO;
-        }
         g_demoDevs[i] = demoDev;
         printk("[demo] device name=%s\n", demoDev->name);
     }
@@ -202,13 +204,6 @@ static int __init demo_init(void)
     printk("[demo] register char device succeeded: %s\n", DEMO_NAME);
 
     return 0;
-
-FREE_KFIFO:
-    for (i = 0; i < MAX_DEMO_DEVICES; i++) {
-        if (&demoDev->fifo) {
-            kfifo_free(&demoDev->fifo);
-        }
-    }
 
 FREE_DEVICE:
     for (i = 0; i < MAX_DEMO_DEVICES; i++) {
@@ -231,9 +226,6 @@ static void __exit demo_exit(void)
     int i;
     for (i = 0; i < MAX_DEMO_DEVICES; i++) {
         if (g_demoDevs[i]) {
-            if (&g_demoDevs[i]->fifo) {
-                kfifo_free(&g_demoDevs[i]->fifo);
-            }
             kfree(g_demoDevs[i]);
         }
     }
