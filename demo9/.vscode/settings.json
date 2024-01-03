@@ -8,7 +8,11 @@
         "kobject.h": "c",
         "stdio.h": "c",
         "fcntl.h": "c",
-        "poll.h": "c"
+        "poll.h": "c",
+        "unistd.h": "c",
+        "syscall.h": "c",
+        "unistd_64.h": "c",
+        "errno.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
