@@ -9,6 +9,7 @@ demo5：虚拟KFIFO设备非阻塞模式
 demo6：虚拟KFIFO设备阻塞模式
 demo7：虚拟KFIFO设备poll机制
 demo8：查看错误的地方
+demo9：作为测试环境
 
 
 # 参考资料
