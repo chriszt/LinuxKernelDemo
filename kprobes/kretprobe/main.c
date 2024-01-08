@@ -1,4 +1,4 @@
-#include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/kprobes.h>
 
@@ -13,7 +13,7 @@ struct my_data {
 static int demo_entry_handler(struct kretprobe_instance *inst, struct pt_regs *regs)
 {
     struct my_data *data;
-    if (!current->mm) {
+    if (!current->mm) {  // skip kernel thread
         return 1;
     }
     data = (struct my_data *)inst->data;
@@ -31,7 +31,7 @@ static int demo_ret_handler(struct kretprobe_instance *inst, struct pt_regs *reg
 
     now = ktime_get();
     delta = ktime_to_ns(ktime_sub(now, data->entry_stamp));
-    pr_info("%s returned %lu and took %lld ns to execute\n", g_func_name, retVal, delta);
+    pr_info("<%s> returned (%lu) and took (%lld) ns to execute\n", g_func_name, retVal, delta);
     return 0;
 }
 NOKPROBE_SYMBOL(demo_ret_handler);
