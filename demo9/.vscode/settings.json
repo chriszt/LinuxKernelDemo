@@ -8,7 +8,12 @@
         "kobject.h": "c",
         "stdio.h": "c",
         "fcntl.h": "c",
-        "miscdevice.h": "c"
+        "miscdevice.h": "c",
+        "kernel.h": "c",
+        "slab.h": "c",
+        "mm.h": "c",
+        "version.h": "c",
+        "mm_types.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

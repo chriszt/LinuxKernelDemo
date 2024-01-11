@@ -1,21 +1,83 @@
+#include <linux/version.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
+#include <linux/slab.h>
+#include <linux/mm.h>
 
-#define DEMO_MISC_DEVICE_NAME "demo_dev"
+#define DEMO_DEVICE_NAME "demo_dev"
+
+static void ShowPhyMemory(void)
+{
+    unsigned long i, pfn, valid = 0;
+    unsigned long numPhysPages;
+    int free = 0, locked = 0, reserved = 0, swapCache = 0, referenced = 0, active = 0,
+        slab = 0, private = 0, uptodate = 0, dirty = 0, writeBack = 0, mappedToDisk = 0;
+    struct page *pg;
+    // int ret;
+
+    numPhysPages = get_num_physpages();
+    printk("numPhysPages=%lu\n", numPhysPages);  // 32638
+    for (i = 0; i < numPhysPages; i++) {
+        pfn = i + 0;  // ARCH_PFN_OFFSET not exist in x86 arch
+        if (pfn_valid(pfn) == 0) {
+            continue;
+        }
+        valid++;
+        pg = pfn_to_page(pfn);
+        if (pg == NULL) {
+            continue;
+        }
+        // printk("_count=%d, _mapcount=%d\n", page_count(pg), page_mapcount(pg));
+        if (page_count(pg) == 0) {
+            free++;
+            continue;
+        }
+        if (PageLocked(pg)) {
+            locked++;
+        }
+        if (PageReserved(pg)) {
+            reserved++;
+        }
+        if (PageSwapCache(pg)) {
+            swapCache++;
+        }
+        if (PageReferenced(pg)) {
+            referenced++;
+        }
+        if (PageActive(pg)) {
+            active++;
+        }
+        if (PageSlab(pg)) {
+            slab++;
+        }
+        if (PagePrivate(pg)) {
+            private++;
+        }
+        if (PageUptodate(pg)) {
+            uptodate++;
+        }
+        if (PageDirty(pg)) {
+            dirty++;
+        }
+        if (PageWriteback(pg)) {
+            writeBack++;
+        }
+        if (PageMappedToDisk(pg)) {
+            mappedToDisk++;
+        }
+    }
+}
 
 static int demo_open(struct inode *i, struct file *f)
 {
-    ktime_t now;
-    now = ktime_get();
-    printk("demo_open(), %lu, %llu\n", sizeof(ktime_t), now);
+    ShowPhyMemory();
     return 0;
 }
 
 static int demo_release(struct inode *i, struct file *f)
 {
-    printk("demo_release()\n");
     return 0;
 }
 
@@ -27,7 +89,7 @@ struct file_operations g_fops = {
 
 struct miscdevice g_miscDev = {
     .minor = MISC_DYNAMIC_MINOR,
-    .name = DEMO_MISC_DEVICE_NAME,
+    .name = DEMO_DEVICE_NAME,
     .fops = &g_fops
 };
 
