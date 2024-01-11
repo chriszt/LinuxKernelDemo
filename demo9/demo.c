@@ -8,6 +8,9 @@
 
 #define DEMO_DEVICE_NAME "demo_dev"
 
+#define PRT(a, b) pr_info("%-15s=%10d %10ld %8ld\n", \
+    (a), (b), (PAGE_SIZE * (b)) / 1024, (PAGE_SIZE * (b)) / 1024 / 1024)
+
 static void ShowPhyMemory(void)
 {
     unsigned long i, pfn, valid = 0;
@@ -18,7 +21,6 @@ static void ShowPhyMemory(void)
     // int ret;
 
     numPhysPages = get_num_physpages();
-    printk("numPhysPages=%lu\n", numPhysPages);  // 32638
     for (i = 0; i < numPhysPages; i++) {
         pfn = i + 0;  // ARCH_PFN_OFFSET not exist in x86 arch
         if (pfn_valid(pfn) == 0) {
@@ -68,6 +70,22 @@ static void ShowPhyMemory(void)
             mappedToDisk++;
         }
     }
+    pr_info("examining %ld pages (get_num_physpages) = %ld MB",
+        numPhysPages, numPhysPages * PAGE_SIZE / 1024 / 1024);
+    pr_info("pages with valid PFN's=%ld, = %ld MB",
+        valid, valid * PAGE_SIZE / 1024 / 1024);
+    PRT("free", free);
+    PRT("locked", locked);
+    PRT("reserved", reserved);
+    PRT("swapCache", swapCache);
+    PRT("referenced", referenced);
+    PRT("active", active);
+    PRT("slab", slab);
+    PRT("private", private);
+    PRT("uptodate", uptodate);
+    PRT("dirty", dirty);
+    PRT("writeBack", writeBack);
+    PRT("mappedToDisk", mappedToDisk);
 }
 
 static int demo_open(struct inode *i, struct file *f)
