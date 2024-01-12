@@ -4,21 +4,23 @@
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 #include <linux/mm.h>
 
 #define DEMO_DEVICE_NAME "demo_dev"
 
+////////////////////////////////////////////////////////////
+
 #define PRT(a, b) pr_info("%-15s=%10d %10ld %8ld\n", \
     (a), (b), (PAGE_SIZE * (b)) / 1024, (PAGE_SIZE * (b)) / 1024 / 1024)
 
-static void ShowPhyMemory(void)
+static void PhyPageTest(void)
 {
     unsigned long i, pfn, valid = 0;
     unsigned long numPhysPages;
     int free = 0, locked = 0, reserved = 0, swapCache = 0, referenced = 0, active = 0,
         slab = 0, private = 0, uptodate = 0, dirty = 0, writeBack = 0, mappedToDisk = 0;
     struct page *pg;
-    // int ret;
 
     numPhysPages = get_num_physpages();
     for (i = 0; i < numPhysPages; i++) {
@@ -88,9 +90,66 @@ static void ShowPhyMemory(void)
     PRT("mappedToDisk", mappedToDisk);
 }
 
+////////////////////////////////////////////////////////////
+
+static void AllocMemoryTest(void)
+{
+    unsigned long order, size;
+    char *buf;
+    const unsigned long MB = 1024 * 1024;
+    const unsigned long mem = 64;
+
+    
+    // try __get_free_pages()
+    for (order = 0, size = PAGE_SIZE; order < MAX_ORDER; order++, size *= 2) {
+        pr_info("order=%2lu, pages=%5lu, size=%8lu\n", order, size / PAGE_SIZE, size);
+        buf = (char *)__get_free_pages(GFP_ATOMIC, order);
+        if (!buf) {
+            pr_err("... __get_free_pages failed\n");
+            break;
+        }
+        pr_info("... __get_free_pages OK, buf=0x%p\n", buf);
+        free_pages((unsigned long)buf, order);
+    }
+
+    // try kmalloc
+    for (order = 0, size = PAGE_SIZE; order < MAX_ORDER; order++, size *= 2) {
+        pr_info("order=%2lu, pages=%5lu, size=%8lu\n", order, size / PAGE_SIZE, size);
+        buf = kmalloc(size, GFP_ATOMIC);
+        if (!buf) {
+            pr_err("... kmalloc failed\n");
+            break;
+        }
+        pr_info("... kmalloc OK, buf=0x%p\n", buf);
+        kfree(buf);
+    }
+
+    // try vmalloc
+    for (size = 4 * MB; size <= mem * MB; size += 4 * MB) {
+        pr_info("pages=%6lu, size=%8lu\n", size / PAGE_SIZE, size / MB);
+        buf = vmalloc(size);
+        if (!buf) {
+            pr_err("... vmalloc failed\n");
+            break;
+        }
+        pr_info("... vmalloc OK, buf=0x%p\n", buf);
+        vfree(buf);
+    }
+}
+
+////////////////////////////////////////////////////////////
+
+static void SlabTest(void)
+{
+
+}
+
+////////////////////////////////////////////////////////////
+
 static int demo_open(struct inode *i, struct file *f)
 {
-    ShowPhyMemory();
+    // PhyPageTest();
+    // AllocMemoryTest();
     return 0;
 }
 
@@ -135,3 +194,5 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Chris ZT");
 MODULE_DESCRIPTION("demo kernel module");
 MODULE_ALIAS("demo");
+
+////////////////////////////////////////////////////////////
