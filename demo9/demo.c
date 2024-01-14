@@ -6,6 +6,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/mm.h>
+#include <linux/sched.h>
 
 #define DEMO_DEVICE_NAME "demo_dev"
 
@@ -141,7 +142,83 @@ static void AllocMemoryTest(void)
 
 static void SlabTest(void)
 {
+    int size = 20;
+    struct kmem_cache *myCache;
+    char *buf;
 
+    if (size > KMALLOC_MAX_SIZE) {  // 4MB
+        pr_info("size=%d is too large, you can NOT have more than %lu\n",
+            size, KMALLOC_MAX_SIZE);
+        return;
+    }
+    
+    myCache = kmem_cache_create("MyCache", size, 0, SLAB_HWCACHE_ALIGN, NULL);
+    if (!myCache) {
+        pr_err("kmem_cache_create failed\n");
+        return; // return -ENOMEM;
+    }
+    pr_info("kmem_cache_create succeeded\n");
+
+    buf = kmem_cache_alloc(myCache, GFP_ATOMIC);
+    if (!buf) {
+        pr_err("kmem_cache_alloc failed\n");
+        kmem_cache_destroy(myCache);
+        return;
+    }
+    pr_err("kmem_cache_alloc succeeded\n");
+
+    if (buf) {
+        kmem_cache_free(myCache, buf);
+        pr_info("kmem_cache_free succeeded\n");
+    }
+
+    if (myCache) {
+        kmem_cache_destroy(myCache);
+        pr_info("kmem_cache_destroy succeeded\n");
+    }
+}
+
+////////////////////////////////////////////////////////////
+
+static void PrintIt(struct task_struct *tsk)
+{
+    struct mm_struct *mm;
+    struct vm_area_struct *vma;
+    int j = 0;
+    unsigned long start, end, length;
+    mm = tsk->mm;
+    pr_info("mm_struct addr=0x%p\n", mm);
+    vma = mm->mmap;
+    down_read(&mm->mmap_lock);
+    pr_info("vmas:    vma    start    end    length\n");
+    while (vma) {
+        j++;
+        start = vma->vm_start;
+        end = vma->vm_end;
+        length = end - start;
+        pr_info("%6d: %16p %12lx %12lx    %8ld\n", j, vma, start, end, length);
+        vma = vma->vm_next;
+    }
+    up_read(&mm->mmap_lock);
+}
+
+static void VmaTest(void)
+{
+    struct task_struct *tsk;
+    int pid = 0;
+    if (pid == 0) {
+        tsk = current;
+        pid = current->pid;
+        pr_info("using current process\n");
+    } else {
+        tsk = pid_task(find_vpid(pid), PIDTYPE_PID);
+    }
+    if (!tsk) {
+        pr_err("can NOT find pid=%d\n", pid);
+        return;
+    }
+    pr_info("examing vma's for pid=%d, command=%s\n", pid, tsk->comm);
+    PrintIt(tsk);
 }
 
 ////////////////////////////////////////////////////////////
@@ -150,6 +227,8 @@ static int demo_open(struct inode *i, struct file *f)
 {
     // PhyPageTest();
     // AllocMemoryTest();
+    // SlabTest();
+    VmaTest();
     return 0;
 }
 

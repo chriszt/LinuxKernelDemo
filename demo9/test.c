@@ -9,6 +9,7 @@
 
 int main()
 {
+    fprintf(stdout, "pid=%d\n", getpid());
     int fd = open(DEMO_DEVICE_NAME, O_RDWR);
     if (fd < 0) {
         fprintf(stderr, "[demo] open device %s failed\n", DEMO_DEVICE_NAME);
