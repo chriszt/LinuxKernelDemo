@@ -1,4 +1,4 @@
-obj-m := demo.o
+obj-m := demo2.o
 
 BASEINCLUDE ?= /home/yl/Kernel/linux-hwe-5.15-5.15.0
 EXTRA_CFLAGS = -O1 -g
