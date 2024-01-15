@@ -205,7 +205,7 @@ static void PrintIt(struct task_struct *tsk)
 static void VmaTest(void)
 {
     struct task_struct *tsk;
-    int pid = 0;
+    int pid = 1;
     if (pid == 0) {
         tsk = current;
         pid = current->pid;
